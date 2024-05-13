@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 
 class Food(BaseModel):
-    id: int
+    id: str
     name: str
     price: float
 

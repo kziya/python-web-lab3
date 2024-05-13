@@ -8,17 +8,14 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_NAME=main
-      - DB_USER=admin
-      - DB_PASSWORD=admin
+      - MONGO_URI=mongodb://admin:admin@db:27017
+
 
   db:
-    image: postgres:14-alpine
+    image: mongo:latest
     ports:
-      - 5432:5432
+      - 27017:27017
     environment:
-      - POSTGRES_PASSWORD=admin
-      - POSTGRES_USER=admin
-      - POSTGRES_DB=main
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=admin
+      - MONGO_INITDB_DATABASE=main

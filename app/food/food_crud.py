@@ -1,68 +1,49 @@
+from bson import ObjectId
 from fastapi import HTTPException
-from psycopg import Cursor
+from pymongo.database import Database
 
 from .food_schemas import Food
 
 
-def get_food_by_name(cursor: Cursor, name: str) -> Food:
-    result = cursor.execute("SELECT * FROM foods WHERE name = %s", (name,)).fetchone()
-    print(result)
+def get_food_by_name(db: Database, name: str) -> Food:
+    collection = db['users']
 
-    return result
+    doc = dict(collection.find_one({'name': name}))
 
-
-def created_food(cursor: Cursor, name: str, price: float) -> Food:
-    cursor.execute("INSERT INTO foods (name, price) VALUES (%s, %s) RETURNING id, name, price;", (name, price,))
-    result = cursor.fetchone()
-
-    cursor.connection.commit()
-    food = Food(id=result[0], name=result[1], price=result[2])
-    return food
+    return Food(name=doc['name'], price=doc['price'], id=str(doc['_id']))
 
 
-def get_food_by_id(cursor: Cursor, food_id: int) -> Food:
-    result = cursor.execute("SELECT * FROM foods WHERE id = %s", (food_id,)).fetchone()
+def created_food(db: Database, name: str, price: float) -> Food:
+    collection = db['users']
 
-    if result is None:
+    insertRes = collection.insert_one({'name': name, 'price': price})
+
+    return get_food_by_id(db, str(insertRes.inserted_id))
+
+
+def get_food_by_id(db: Database, food_id: str) -> Food:
+    collection = db['users']
+
+    doc = collection.find_one({'_id': ObjectId(food_id)})
+
+    if doc is None:
         raise HTTPException(status_code=404, detail="Food not found")
 
-    return Food(id=result[0], name=result[1], price=result[2])
+    return Food(name=doc['name'], price=doc['price'], id=str(food_id))
 
 
-def updated_food(cursor: Cursor, id: int, name: str, price: float) -> Food:
-    queryString = "UPDATE foods SET"
-    parameters = []
-
+def updated_food(db: Database, id: str, name: str, price: float) -> Food:
+    collection = db['users']
+    updateObject = {}
     if name is not None:
-        # Check if the new name already exists
-        isExistsName = get_food_by_name(cursor, name)
-        if isExistsName is not None:
-            raise HTTPException(status_code=400, detail="Food name already exists")
-        queryString += " name = %s"
-        parameters.append(name)
-
+        updateObject['name'] = name
     if price is not None:
-        if name is not None:
-            queryString += ","
-        queryString += " price = %s"
-        parameters.append(price)
+        updateObject['price'] = price
 
-    queryString += " WHERE id = %s RETURNING id, name, price;"
-    parameters.append(id)
-
-    cursor.execute(queryString, parameters)
-
-    updated_row = cursor.fetchone()
-    cursor.connection.commit()
-
-    return Food(id=updated_row[0], name=updated_row[1], price=updated_row[2])
+    collection.update_one({'_id': ObjectId(id)}, {'$set': updateObject})
+    return get_food_by_id(db, id)
 
 
-def delete_food(cursor: Cursor, food_id: int) -> None:
-    isExists = get_food_by_id(cursor, food_id);
-    if isExists is None:
-        raise HTTPException(status_code=404, detail="Food not found")
-
-    cursor.execute("DELETE FROM foods WHERE id = %s", (food_id,))
-    cursor.connection.commit()
+def delete_food(db: Database, food_id: str) -> None:
+    db['users'].delete_one({'_id': ObjectId(food_id)})
     return None
